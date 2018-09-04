@@ -1,0 +1,35 @@
+#!/bin/sh /etc/rc.common
+
+START=100
+STOP=150
+
+EXTRA_COMMANDS="enable_firewall"
+EXTRA_HELP="        enable_firewall  Enable firewall redirects"
+
+start() {
+	/usr/bin/node /www/ecr-app/index.js > /dev/null &
+	logger "We run nodejs and firewall"
+}
+
+boot() {
+	start
+}
+
+stop() {
+	echo stop
+	# commands to kill application
+}
+
+enable_firewall() {
+	/sbin/uci set firewall.@zone[1].forward='ACCEPT'
+	/sbin/uci delete firewall.@zone[1].network
+	/sbin/uci add_list firewall.@zone[1].network='wwan'
+	/sbin/uci add_list firewall.@zone[1].network='wan'
+	/sbin/uci add_list firewall.@zone[1].network='usb1'
+	/sbin/uci add_list firewall.@zone[1].network='bnep0'
+	/sbin/uci delete firewall.@zone[0].network
+	/sbin/uci add_list firewall.@zone[0].network='wlan'
+	/sbin/uci add_list firewall.@zone[0].network='usb0'
+	/sbin/uci commit
+	/etc/init.d/firewall restart
+}
