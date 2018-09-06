@@ -37,6 +37,18 @@ var uriA4200 = '/cgi/anaf/a4200';
 var uriA4203 = '/cgi/anaf/a4203';
 
 /**
+ * URI of the fiscal memory report
+ * @type {string}
+ */
+var uriFMemory = '/cgi/anaf/fmem';
+
+/**
+ * URI of the electronic journal report
+ * @type {string}
+ */
+var uriEJournal = '/cgi/anaf/ejourn';
+
+/**
  * Undefined variable
  */
 var undefined;
@@ -130,7 +142,7 @@ function processReport(start, end) {
     return new Promise(function (resolve, reject) {
 
         /**
-         * Get A4200 XML
+         * Get A4200 P7B
          */
         var queryString = httpBuildQuery({
             from: start,
@@ -141,30 +153,42 @@ function processReport(start, end) {
                 name: 'a4200_' + start + '_' + end + '.p7b',
                 content: responseA4200
             });
+			
+			/**
+			* Get electonic journal report
+			*/
+			client.runRequest(uriFMemory + '?' + queryString, 'GET').then(function (responseFMemory) {
+				files.push({
+					name: 'fmem_' + start + '_' + end + '.mf',
+					content: responseFMemory
+				});
+				/**
+				 * Get all corresponding A4203 files
+				 */
+				processA4203(start, end, function (err) {
 
-            /**
-             * Get all corresponding A4203 files
-             */
-            processA4203(start, end, function (err) {
+					/**
+					 * If all files were generated successfully
+					 */
+					if (err == undefined) {
 
-                /**
-                 * If all files were generated successfully
-                 */
-                if (files.length == 2 + end - start) {
-
-                    /**
-                     * Write files to the filesystem
-                     */
-                    writeFiles(start, end).then(function () {
-						resolve();
-					}, function (response) {
-						reject(response);
-					});
-                }
-                else {
-                    reject(err);
-                }
-            });
+						/**
+						 * Write files to the filesystem
+						 */
+						writeFiles(start, end).then(function () {
+							resolve();
+						}, function (response) {
+							reject(response);
+						});
+					}
+					else {
+						reject(err);
+					}
+				});
+			}, function (err) {
+				reject(err);
+			});
+            
         }, function (err) {
             reject(err);
         });
@@ -277,17 +301,25 @@ function processA4203(currentZ, end, callback) {
             name: 'a4203_' + currentZ + '.p7b',
             content: responseXML
         });
-        /**
-         * If current Z-report number is less than last
-         * than continue
-         * Else run callback function
-         */
-        if (currentZ < end) {
-            processA4203(currentZ + 1, end, callback);
-        }
-        else {
-            callback();
-        }
+		client.runRequest(uriEJournal + '?' + queryString, 'GET').then(function (responseEJournal) {
+			files.push({
+				name: 'ejournal_' + currentZ + '.ej',
+				content: responseEJournal
+			});
+			/**
+			 * If current Z-report number is less than last
+			 * than continue
+			 * Else run callback function
+			 */
+			if (currentZ < end) {
+				processA4203(currentZ + 1, end, callback);
+			}
+			else {
+				callback();
+			}
+		}, function (err) {
+			callback(err);
+		});
     }, function (err) {
         callback(err);
     });
