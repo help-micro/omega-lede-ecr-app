@@ -1,7 +1,7 @@
 var http = require('http'),
     httpProxy = require('http-proxy');
 	
-var report = require('./report.js');
+//var report = require('./report.js');
 
 var undefined;
 
@@ -47,10 +47,10 @@ var server = http.createServer(function(req, res) {
 server.listen(5050);
 
 // Set IP address
-report.setIPAddress(global.ip);
+//report.setIPAddress(global.ip);
 
 // Check periodically the status of the cash register
-setInterval(function () {
+/*setInterval(function () {
 	if (!global.isLocked) { 
 		global.isLocked = true;
 		try {
@@ -76,4 +76,4 @@ setInterval(function () {
 		catch (ex) {}
 	}
 	
-}, interval);
+}, interval); */
