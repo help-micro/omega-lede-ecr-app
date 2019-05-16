@@ -6,7 +6,7 @@ var http = require('http'),
 var undefined;
 
 // Cash register IP address
-global.ip = "192.168.8.100"
+global.ip = "192.168.9.100"
 
 // Common error message if the type of the error isn't detected
 var commonErrorMessage = "Device is offline";
