@@ -1,2 +1,2 @@
 // Cash register IP address
-exports.ip = "192.168.0.103"
+exports.ip = "192.168.9.100"

@@ -1,12 +1,14 @@
 var http = require('http'),
     httpProxy = require('http-proxy');
+
+var common = require('./common');
 	
 //var report = require('./report.js');
 
 var undefined;
 
 // Cash register IP address
-global.ip = "192.168.9.100"
+global.ip = common.ip;
 
 // Common error message if the type of the error isn't detected
 var commonErrorMessage = "Device is offline";

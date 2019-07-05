@@ -8,6 +8,7 @@ EXTRA_HELP="        enable_firewall  Enable firewall redirects"
 
 start() {
 	/usr/bin/node /www/ecr-app/index.js > /dev/null &
+	/usr/bin/node /www/ecr-app/hid.js > /dev/null &
 	logger "We run nodejs and firewall"
 }
 
