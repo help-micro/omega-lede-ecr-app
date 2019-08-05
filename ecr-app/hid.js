@@ -78,6 +78,12 @@ var sendBuffer = function(bufferQueue) {
     });
 };
 
+/* Convert number to zero padded string */
+var toPaddedHexString = function (num, len) {
+	str = num.toString(16);
+    return "0".repeat(len - str.length) + str;
+};
+
 /* Callback for data recieve from the device */
 var onDataRecieve = function (data) {
 	/* Get the modifier byte and the first data slot */
@@ -107,7 +113,8 @@ var onDataRecieve = function (data) {
 		}
 	}
 	if (isNecessaryToPush) {
-		bufferToSend.push([modifierByte, valuableKey]);
+		var sendByte = parseInt("0x" + toPaddedHexString(modifierByte, 2) + toPaddedHexString(valuableKey, 2));
+		bufferToSend.push(sendByte);
 	}
 	previousData = data;
 }
