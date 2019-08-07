@@ -25,6 +25,15 @@ const KEY_MOD_RSHIFT = 0x20
 const KEY_MOD_RALT = 0x40
 const KEY_MOD_RMETA = 0x80
 
+const KEY_CAPSLOCK = 0x39
+const KEY_NUMLOCK = 0x53
+const KEY_SCROLLLOCK = 0x47
+
+var KEY_LED_OFFSET = {};
+KEY_LED_OFFSET[KEY_NUMLOCK] = 0x01;
+KEY_LED_OFFSET[KEY_CAPSLOCK] = 0x02;
+KEY_LED_OFFSET[KEY_SCROLLLOCK] = 0x04;
+
 
 const INTERVAL = 200; // interval to send queued buffer
 const DATA_OFFSET = 2; // offset from buffer which indicates first data byte position
@@ -37,6 +46,7 @@ var hidDevices = {}; // dictionary of active HID devices
 var bufferToSend = []; // buffer to send data to server
 var previousData = null; // previous buffer data to compare with current buffer
 var urlSendBuffer = '/index2.php'; // URI to send buffer
+var ledKeys = [KEY_CAPSLOCK, KEY_NUMLOCK, KEY_SCROLLLOCK]; // keys corresponding to LEDs
 
 /**
 * Define functions
@@ -86,9 +96,12 @@ var toPaddedHexString = function (num, len) {
 
 /* Callback for data recieve from the device */
 var onDataRecieve = function (data) {
+	
 	/* Get the modifier byte and the first data slot */
 	var firstKey = data[DATA_OFFSET];
 	var modifierByte = data[MODIFIER_BYTE_OFFSET];
+	
+	var device = this;
 	
 	var isNecessaryToPush = false;
 	var valuableKey = firstKey;
@@ -100,21 +113,41 @@ var onDataRecieve = function (data) {
 		if (previousData != null) {
 			/* Check if new position has been found inside the buffer
 			*  comparing with previous buffer
+			* Also check if current buffer and previous buffer are different to avoid duplications
 			*/
 			var slotCountData = getValuableSlotsCount(data);
 			var slotCountPrevData = getValuableSlotsCount(previousData);
-			if (slotCountData >= slotCountPrevData) {
+			
+			if (slotCountData >= slotCountPrevData && Buffer.compare(data, previousData) != 0) {
 				valuableKey = data[DATA_OFFSET + slotCountData - 1];
 				isNecessaryToPush = true;
 			}
 		}
 		else {
 			isNecessaryToPush = true;
+			previousData = data;
 		}
 	}
 	if (isNecessaryToPush) {
-		var sendByte = parseInt("0x" + toPaddedHexString(modifierByte, 2) + toPaddedHexString(valuableKey, 2));
-		bufferToSend.push(sendByte);
+		
+		/*
+		* Check if some of LED buttons has been pressed
+		* than refresh current led status of the keyboard and send signal to turn on/off LED
+		*/
+		if (ledKeys.indexOf(valuableKey) > -1) {
+			device.ledStatus = device.ledStatus ^ KEY_LED_OFFSET[valuableKey];
+			
+			// Turn on/off LED
+			// LED status consists of the single byte
+			device.write([0x00, device.ledStatus]);
+		}
+		else {
+			
+			// Prepare number to send. Number consists of 3 bytes
+			// First byte - LED status, second byte - modifier byte, third byte - valuable key
+			var sendByte = parseInt("0x" + toPaddedHexString(device.ledStatus, 2) + toPaddedHexString(modifierByte, 2) + toPaddedHexString(valuableKey, 2));
+			bufferToSend.push(sendByte);
+		}
 	}
 	previousData = data;
 }
@@ -127,9 +160,9 @@ var registerNewDevice = function (vendorId, productId) {
 		hidDevice.on("data", onDataRecieve);
 		hidDevice.on("error", function() {});
 		hidDevices[usbHidID] = hidDevice;
-		device.hidID = usbHidID;
+		hidDevice.ledStatus = 0x00;
 	}
-	catch (error) {}
+	catch (error) { }
 };
 
 // Collect all existing HID devices and register them
@@ -164,8 +197,9 @@ usbDetect.on('remove', function(device) {
 setInterval(function() {
 	if (bufferToSend.length > 0) {
 		dataSend = bufferToSend.slice();
+		bufferToSend = bufferToSend.slice(dataSend.length);
 		sendBuffer(dataSend).then(function() {
-			bufferToSend = bufferToSend.slice(dataSend.length);
+			
 		});
 	}
 }, INTERVAL);
