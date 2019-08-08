@@ -45,7 +45,7 @@ const MODIFIER_BYTE_OFFSET = 0; // position of the modifier byte
 var hidDevices = {}; // dictionary of active HID devices
 var bufferToSend = []; // buffer to send data to server
 var previousData = null; // previous buffer data to compare with current buffer
-var urlSendBuffer = '/index2.php'; // URI to send buffer
+var urlSendBuffer = '/cgi/tcpkeyboard'; // URI to send buffer
 var ledKeys = [KEY_CAPSLOCK, KEY_NUMLOCK, KEY_SCROLLLOCK]; // keys corresponding to LEDs
 
 /**
