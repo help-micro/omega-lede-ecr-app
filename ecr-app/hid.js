@@ -161,6 +161,7 @@ var registerNewDevice = function (vendorId, productId) {
 		hidDevice.on("error", function() {});
 		hidDevices[usbHidID] = hidDevice;
 		hidDevice.ledStatus = 0x00;
+		bufferToSend.push(parseInt("0x00"));
 	}
 	catch (error) { }
 };
