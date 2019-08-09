@@ -47,6 +47,7 @@ var bufferToSend = []; // buffer to send data to server
 var previousData = null; // previous buffer data to compare with current buffer
 var urlSendBuffer = '/cgi/tcpkeyboard'; // URI to send buffer
 var ledKeys = [KEY_CAPSLOCK, KEY_NUMLOCK, KEY_SCROLLLOCK]; // keys corresponding to LEDs
+var bufferPressed = []; // buffer that contains all current pressed keys
 
 /**
 * Define functions
@@ -88,6 +89,17 @@ var sendBuffer = function(bufferQueue) {
     });
 };
 
+var isBufferZeroFilled = function (buf) {
+	var isZeroFilled = true;
+	var i = 0;
+	for (i = 0; i < buf.length; i++) {
+		if (buf[i] != 0x00) {
+			isZeroFilled = false;
+		}
+	}
+	return isZeroFilled;
+};
+
 /* Convert number to zero padded string */
 var toPaddedHexString = function (num, len) {
 	str = num.toString(16);
@@ -106,10 +118,42 @@ var onDataRecieve = function (data) {
 	var isNecessaryToPush = false;
 	var valuableKey = firstKey;
 	
+	/*
+	* Check if all buttons have been released or not 
+	*/
+	if (isBufferZeroFilled(data)) {
+		/*
+		* Loop through buffer and check if just modifiers keys were pressed before release
+		*/
+		var modifierKey = -1;
+		var isModifiersOnly = true;
+		bufferPressed.forEach(function(buf) {
+			if (buf[DATA_OFFSET] > KEY_ERR_UNDEFINED) {
+				isModifiersOnly = false;
+			}
+			else {
+				if (modifierKey < buf[MODIFIER_BYTE_OFFSET]) {
+					modifierKey = buf[MODIFIER_BYTE_OFFSET];
+				}
+			}
+		});
+		if (isModifiersOnly) {
+			isNecessaryToPush = true;
+			valuableKey = 0x00;
+			modifierByte = modifierKey;
+		}
+		bufferPressed = [];
+	}
+	else {
+		bufferPressed.push(data);
+	}
+	
+	
 	/* If the data key slot doesn't contain an error value 
 	*  than check if new key was pressed
 	*/
 	if (firstKey > KEY_ERR_UNDEFINED) {
+		
 		if (previousData != null) {
 			/* Check if new position has been found inside the buffer
 			*  comparing with previous buffer
