@@ -185,13 +185,11 @@ var onDataRecieve = function (data) {
 			// LED status consists of the single byte
 			device.write([0x00, device.ledStatus]);
 		}
-		else {
-			
-			// Prepare number to send. Number consists of 3 bytes
-			// First byte - LED status, second byte - modifier byte, third byte - valuable key
-			var sendByte = parseInt("0x" + toPaddedHexString(device.ledStatus, 2) + toPaddedHexString(modifierByte, 2) + toPaddedHexString(valuableKey, 2));
-			bufferToSend.push(sendByte);
-		}
+		
+		// Prepare number to send. Number consists of 3 bytes
+		// First byte - LED status, second byte - modifier byte, third byte - valuable key
+		var sendByte = parseInt("0x" + toPaddedHexString(modifierByte, 2) + toPaddedHexString(valuableKey, 2));
+		bufferToSend.push(sendByte);
 	}
 	previousData = data;
 }
