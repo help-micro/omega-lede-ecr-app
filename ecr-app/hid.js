@@ -276,25 +276,51 @@ var onDataRecieve = function (data) {
 	previousData = data;
 }
 
-// Try to register new HID device
-var registerNewDevice = function (vendorId, productId) {
-	try {
-		var usbHidID = uuid.v4();
-		var hidDevice = new HID.HID(vendorId, productId);
-		hidDevice.on("data", onDataRecieve);
-		hidDevice.on("error", function() {});
-		hidDevices[usbHidID] = hidDevice;
-		hidDevice.ledStatus = 0x00;
-		bufferToSend.push(parseInt("0x00"));
+/* Attempt to register new device */
+var registerDeviceAttempt = function (vendorId, productId, path, usbHidID, repeat) {
+	var hidDevice;
+	if (repeat) {
+		hidDevice = new HID.HID(path);
 	}
-	catch (error) { }
+	else {
+		hidDevice = new HID.HID(vendorId, productId);
+	}
+	hidDevice.on("data", onDataRecieve);
+	hidDevice.on("error", function() {});
+	hidDevices[usbHidID] = hidDevice;
+	hidDevice.ledStatus = 0x00;
+	bufferToSend.push(parseInt("0x00"));
 };
 
-// Collect all existing HID devices and register them
-var hDevices = HID.devices();
-hDevices.forEach(function (hDevice) {
-	registerNewDevice(hDevice.vendorId, hDevice.productId);
-});
+// Try to register new HID device
+var registerNewDevice = function (vendorId, productId, path) {
+	var usbHidID = vendorId + productId;
+	try {
+		registerDeviceAttempt(vendorId, productId, path, usbHidID);
+	}
+	catch (error) {
+		try {
+			registerDeviceAttempt(vendorId, productId, path, usbHidID, true);
+		}
+		catch (error) { 
+		}
+	}
+};
+
+/* Reregister all devices */
+var reloadHIDDevices = function () {
+	
+	delete hidDevices;
+	
+	// Collect all existing HID devices and register them
+	var hDevices = HID.devices();
+	hDevices.forEach(function (hDevice) {
+		registerNewDevice(hDevice.vendorId, hDevice.productId, hDevice.path);
+	});
+};
+
+// Get avaialble devices from the startup
+reloadHIDDevices();
 
 
 // Start monitoring of USB devices
@@ -302,17 +328,27 @@ usbDetect.startMonitoring();
  
 // Detect add device event
 usbDetect.on('add', function(device) {
+	
+	// Close all current devices
+	for (deviceID in hidDevices) {
+		hidDevices[deviceID].close();
+	}
+	
+	// Reload all HID devices
+	reloadHIDDevices();
+	
 	/* Try to define HID device and init event listeners */
-	registerNewDevice(device.vendorId, device.productId);
+	//registerNewDevice(device.vendorId, device.productId);
 });
 
 // Detect remove device event
 usbDetect.on('remove', function(device) {
 	try {
-		if (device.hidID in hidDevices) {
-			var hidDevice = hidDevices[device.hidID];
+		var usbHidID = device.vendorId + device.productId;
+		if (usbHidID in hidDevices) {
+			var hidDevice = hidDevices[usbHidID];
 			hidDevice.close();
-			delete hidDevices[device.hidID];
+			delete hidDevices[usbHidID];
 		}
 	}
 	catch (error) {}
