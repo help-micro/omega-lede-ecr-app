@@ -38,6 +38,8 @@ KEY_LED_OFFSET[KEY_SCROLLLOCK] = 0x04;
 const INTERVAL = 200; // interval to send queued buffer
 const DATA_OFFSET = 2; // offset from buffer which indicates first data byte position
 const MODIFIER_BYTE_OFFSET = 0; // position of the modifier byte
+const SCAN_PREFIX = [0x022E, 0x022E]; // scan codes of prefix to detect a barcode scanner
+const SCAN_SUFFIX = [0x28]; // scan codes of suffix to send data of a barcode scanner
 
 /**
 * Set variables
@@ -46,8 +48,12 @@ var hidDevices = {}; // dictionary of active HID devices
 var bufferToSend = []; // buffer to send data to server
 var previousData = null; // previous buffer data to compare with current buffer
 var urlSendBuffer = '/cgi/tcpkeyboard'; // URI to send buffer
+var urlSendBufferScanner = '/cgi/tcpscanner'; // URI to send a buffer from a scanner
 var ledKeys = [KEY_CAPSLOCK, KEY_NUMLOCK, KEY_SCROLLLOCK]; // keys corresponding to LEDs
 var bufferPressed = []; // buffer that contains all current pressed keys
+var isScanner = false; // flag that indicates scanning process
+var isPossibleScanner = false; // flag that indicates the first symbol of a scan code prefix
+var isAllowedToSend = true; // flag that indicates the possibility to send data using the time interval
 
 /**
 * Define functions
@@ -72,10 +78,28 @@ var getValuableSlotsCount = function (buffer) {
 	return count;
 };
 
+/* Send all current buffer data
+ * @isScanner - flag to check if scanner or keyboard data should be sent
+ */
+var sendAllBuffer = function (isScanner) {
+	if (bufferToSend.length > 0) {
+		dataSend = bufferToSend.slice();
+		bufferToSend = bufferToSend.slice(dataSend.length);
+		sendBuffer(dataSend, isScanner).then(function() {	
+		});
+	}
+};
+
 /* Send buffer data */
-var sendBuffer = function(bufferQueue) {
+var sendBuffer = function(bufferQueue, isScanner) {
+	
+	// Select URI due to source type
+	var url = urlSendBuffer;
+	if (isScanner) {
+		url = urlSendBufferScanner;
+	}
 	return new Promise(function (resolve, reject) {
-        client.runRequest(urlSendBuffer, 'POST', bufferQueue, {
+        client.runRequest(url, 'POST', bufferQueue, {
             json: true,
 			timeout: 1000,
             headers: {
@@ -89,6 +113,7 @@ var sendBuffer = function(bufferQueue) {
     });
 };
 
+/* Check if buffer consists of zeros */
 var isBufferZeroFilled = function (buf) {
 	var isZeroFilled = true;
 	var i = 0;
@@ -189,7 +214,64 @@ var onDataRecieve = function (data) {
 		// Prepare number to send. Number consists of 3 bytes
 		// First byte - LED status, second byte - modifier byte, third byte - valuable key
 		var sendByte = parseInt("0x" + toPaddedHexString(modifierByte, 2) + toPaddedHexString(valuableKey, 2));
-		bufferToSend.push(sendByte);
+		
+		// If scanner mode is turned on
+		if (isScanner) {
+			
+			// Check if the end mark of a code is detected
+			if (sendByte == SCAN_SUFFIX[0]) {
+				
+				// Send code to the URI of scanner
+				// Reset variables and resume background data sent
+				sendAllBuffer(true);
+				isScanner = false;
+				isAllowedToSend = true;
+			}
+			else {
+				
+				// Push code to the buffer
+				bufferToSend.push(sendByte);
+			}
+		}
+		else {
+			
+			// If the first symbol of the prefix was previously detected
+			if (isPossibleScanner) {
+			
+				// Check if the next symbol also coincides with a prefix pattern and turn on scanner mode
+				if (sendByte == SCAN_PREFIX[1]) {
+					isScanner = true;
+				}
+				else {
+					
+					// Push the first prefix symbol and the current symbol to the buffer
+					bufferToSend.push(SCAN_PREFIX[0]);
+					bufferToSend.push(sendByte);
+					isAllowedToSend = true;
+				}
+				isPossibleScanner = false;
+			}
+			else {
+				
+				// Check if the current symbol equals to the first prefix symbol
+				if (sendByte == SCAN_PREFIX[0]) {
+					
+					// Detect the possible scanner mode
+					isPossibleScanner = true;
+					isAllowedToSend = false;
+					
+					// Send all current buffer to free it
+					sendAllBuffer();
+				}
+				else {
+					
+					if (!isNaN(sendByte)) {
+						// Add the current symbol to the buffer
+						bufferToSend.push(sendByte);
+					}
+				}
+			}
+		}
 	}
 	previousData = data;
 }
@@ -236,13 +318,29 @@ usbDetect.on('remove', function(device) {
 	catch (error) {}
 });
 
+// Variable that indicates the previous 'allowed' state for sending
+var prevIntervalState = true;
+
 // Send queued buffer data
 setInterval(function() {
-	if (bufferToSend.length > 0) {
-		dataSend = bufferToSend.slice();
-		bufferToSend = bufferToSend.slice(dataSend.length);
-		sendBuffer(dataSend).then(function() {
-			
-		});
+	
+	// Check if it is not allowed to send and the previous attempt also failed
+	if (!isAllowedToSend && !prevIntervalState) {
+		
+		// Allow to send and resent scan prefixes
+		isAllowedToSend = true;
+		if (isPossibleScanner) {
+			bufferToSend.push(SCAN_PREFIX[0]);
+		}
+		if (isScanner) {
+			bufferToSend.push(SCAN_PREFIX[0]);
+			bufferToSend.push(SCAN_PREFIX[1]);
+		}
+		isPossibleScanner = false;
+		isScanner = false;
 	}
+	if (bufferToSend.length > 0 && isAllowedToSend) {
+		sendAllBuffer();
+	}
+	prevIntervalState = isAllowedToSend;
 }, INTERVAL);
