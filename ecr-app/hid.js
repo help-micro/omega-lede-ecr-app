@@ -38,7 +38,7 @@ KEY_LED_OFFSET[KEY_SCROLLLOCK] = 0x04;
 const INTERVAL = 200; // interval to send queued buffer
 const DATA_OFFSET = 2; // offset from buffer which indicates first data byte position
 const MODIFIER_BYTE_OFFSET = 0; // position of the modifier byte
-const SCAN_PREFIX = [0x022E, 0x022E]; // scan codes of prefix to detect a barcode scanner
+const SCAN_PREFIX = [0x0225, 0x0225]; // scan codes of prefix to detect a barcode scanner
 const SCAN_SUFFIX = [0x28]; // scan codes of suffix to send data of a barcode scanner
 
 /**
