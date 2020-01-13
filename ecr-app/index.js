@@ -1,7 +1,13 @@
 var http = require('http'),
+	https = require('https'),
     httpProxy = require('http-proxy');
 
 var common = require('./common');
+
+// CA certificates
+var rootCas = require('ssl-root-cas/latest').create();
+//rootCas.addFile(__dirname + '/ssl/cert.cer');
+https.globalAgent.options.ca = rootCas;
 	
 //var report = require('./report.js');
 
@@ -48,34 +54,20 @@ var server = http.createServer(function(req, res) {
 //console.log("listening on port 5050")
 server.listen(5050);
 
-// Set IP address
-//report.setIPAddress(global.ip);
-
-// Check periodically the status of the cash register
-/*setInterval(function () {
-	if (!global.isLocked) { 
-		global.isLocked = true;
-		try {
-			report.getCurrentANAFState().then(function (state) {
-				report.processANAFState(state).then(function (message) {
-					console.log(message);
-				}, function (errorMessage) {
-					if (errorMessage == undefined) {
-						errorMessage = commonErrorMessage;
-					}
-					console.log(errorMessage);
-				})
-				// Always handler
-					.then(function () {
-						global.isLocked = false;
-
-					});
-			}, function () {
-				console.log(commonErrorMessage);
-				global.isLocked = false; 
-			});
-		}
-		catch (ex) {}
-	}
-	
-}, interval); */
+//
+// Create a HTTP Proxy server with a HTTPS target
+//
+var proxyHTTPS = httpProxy.createProxyServer();
+var serverProxy = http.createServer(function(req, res) {
+	//console.log(req.headers);
+	var targetHost = req.headers['proxy-host'];
+	proxyHTTPS.web(req, res, {
+		target: 'https://' + targetHost,
+		agent  : https.globalAgent,
+		headers: {
+			host: targetHost
+		},
+		secure: false
+	});
+});
+serverProxy.listen(3000);
