@@ -46,6 +46,7 @@ proxy.on('error', function (err, req, res) {
 	res.writeHead(500, {
     	'Content-Type': 'text/plain'
   	});
+	console.log(err);
 
   	res.end('Device is offline');
 });
@@ -83,6 +84,8 @@ var localTunnelAttempts = 0;
 // Serial number of a device
 var serialNumber = null;
 
+var isServerNotified = false;
+
 // Set session
 app.use(session({
     secret: uuid.v4().toString(),
@@ -93,7 +96,7 @@ app.use(session({
 
 // Login endpoint
 app.get('/login', function (req, res) {
-	console.log(req.session);
+	
   if (!req.query.username || !req.query.password) {
     res.send('login failed');    
   } else if(req.query.username === localTunnelUsername || req.query.password === localTunnelPassword) {
@@ -154,7 +157,7 @@ function notifyAboutTunnel() {
 	if (localTunnelApiKey != null) {
 		
 		// If the server was not previously notified about new address
-		if (localTunnelAttempts < MAX_ATTEMPTS && !isForwardActive) {
+		if (localTunnelAttempts < MAX_ATTEMPTS && !isServerNotified) {
 			
 			console.log('notify');
 			
@@ -173,15 +176,15 @@ function notifyAboutTunnel() {
 			
 			// Run requests
 			client.runRequestUnauthorized(localTunnelApiEndpoint, 'POST', body, extraOptions).then(function (response) {
-				isForwardActive = true;
+				isServerNotified = true;
 				localTunnelAttempts = 0;
 			}, function (err) {
 				localTunnelAttempts += 1;
 			});
-		}
+		} 
 		else {
 			localTunnelAttempts = 0;
-			isForwardActive = false;
+			isServerNotified = false;
 		}
 	}
 }
@@ -205,8 +208,7 @@ setInterval(function() {
 // Get API key and start the process of the retrieving of a global address 
 cmd.get(`uci get system.@system[0].api`, function (err, data, stderr) {
 	localTunnelApiKey = data.trim();
-	if (localTunnelApiKey.length > 0) {
-		console.log(localTunnelApiKey);
+	if (localTunnelApiKey.length == 32) { 
 		setInterval(function () {
 			try {
 				if (!isForwardActive) {
@@ -216,6 +218,8 @@ cmd.get(`uci get system.@system[0].api`, function (err, data, stderr) {
 						// the assigned public url for your tunnel
 						// i.e. https://abcdefgjhij.localtunnel.me
 						else {
+							isForwardActive = true;
+							isServerNotified = false;
 							localTunnelAddress = tunnel.url + "/login?username=" + localTunnelUsername + "&password=" + localTunnelPassword;
 							notifyAboutTunnel();
 						}
