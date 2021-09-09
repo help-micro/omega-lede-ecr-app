@@ -8,7 +8,7 @@ EXTRA_HELP="        enable_firewall  Enable firewall redirects"
 
 start() {
 	/usr/bin/node /www/ecr-app/index.js > /dev/null &
-	/usr/bin/node /www/ecr-app/hid.js > /dev/null &
+	#/usr/bin/node /www/ecr-app/hid.js > /dev/null &
 	logger "We run nodejs and firewall"
 }
 
@@ -32,5 +32,14 @@ enable_firewall() {
 	/sbin/uci add_list firewall.@zone[0].network='wlan'
 	/sbin/uci add_list firewall.@zone[0].network='usb0'
 	/sbin/uci commit
+	
+	/sbin/uci add firewall rule
+	/sbin/uci set firewall.@rule[-1].name='Allow-localtunnel'
+	/sbin/uci set firewall.@rule[-1].dest_port='1191'
+	/sbin/uci set firewall.@rule[-1].src_port='1191'
+	/sbin/uci set firewall.@rule[-1].proto='tcp'
+	/sbin/uci set firewall.@rule[-1].target='ACCEPT'
+	/sbin/uci commit firewall
+	
 	/etc/init.d/firewall restart
 }
